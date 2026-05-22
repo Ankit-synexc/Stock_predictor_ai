@@ -7,7 +7,7 @@
 'use strict';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'https://stock-predictor-ai-ut59.onrender.com/';
 // Path to default CSV (served from the same origin or use a relative fetch)
 // When opened via file://, we load via <input> upload. When served via HTTP we try to fetch.
 const DEFAULT_CSV_PATH = '../Data/AAPL_indicators_1980-12-12_to_2026-05-18.csv';
