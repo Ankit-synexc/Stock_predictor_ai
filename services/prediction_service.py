@@ -57,24 +57,32 @@ class PredictionService:
         features = self.metadata.get("features_used", [])
 
         if (
-            self.model is not None
-            and self.pipeline is not None
-            and self.metadata.get("algorithm") != "mock"
+                self.model is not None
+                and self.pipeline is not None
+                and self.metadata.get("algorithm") != "mock"
         ):
             try:
                 last_row = df.iloc[-1].to_dict()
-                row      = {f: last_row.get(f, 0.0) for f in features}
-                df_feat  = pd.DataFrame([row], columns=features)
-                X        = self.pipeline.transform(df_feat)
+                row = {f: last_row.get(f, 0.0) for f in features}
+                df_feat = pd.DataFrame([row], columns=features)
+                X = self.pipeline.transform(df_feat)
 
                 prediction = self.model.predict(X)[0]
 
-                # Confidence — works properly with RandomForestClassifier.predict_proba
-                confidence = None
+                # FIX: Handle Regressors that don't have predict_proba
+                confidence = 0.60  # Default safe fallback
                 if hasattr(self.model, "predict_proba"):
-                    proba      = self.model.predict_proba(X)[0]
+                    proba = self.model.predict_proba(X)[0]
                     confidence = round(float(max(proba)), 4)
-                
+                else:
+                    try:
+                        pred_val = float(prediction)
+                        if 0.0 <= pred_val <= 1.0:
+                            # If regressor outputs a probability proxy (e.g., 0.82)
+                            confidence = round(pred_val if pred_val >= 0.5 else 1.0 - pred_val, 4)
+                    except:
+                        pass
+
                 logger.info(f"Predicted target {prediction} with probability {confidence}")
                 direction = self._normalise_direction(prediction)
             except Exception as e:
@@ -83,7 +91,7 @@ class PredictionService:
 
         else:
             # Mock fallback (model not loaded)
-            direction  = random.choice(["UP", "UP", "DOWN"])
+            direction = random.choice(["UP", "UP", "DOWN"])
             confidence = round(random.uniform(0.51, 0.75), 4)
 
         return direction, confidence
