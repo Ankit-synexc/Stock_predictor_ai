@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockSense — AI Stock Predictor Dashboard</title>
+  <meta name="description" content="AI-powered stock prediction dashboard with real-time candlestick charts, OHLCV analysis, live predictions, and historical data from ML models." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <!-- Lightweight CSV parser -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Lightweight charting library -->
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ══════════════════ SIDEBAR ══════════════════ -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">StockSense</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li class="nav-item active" data-tab="chart" id="nav-chart">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Chart</span>
+      </li>
+      <li class="nav-item" data-tab="predict" id="nav-predict">
+        <span class="nav-icon">🔮</span>
+        <span class="nav-label">Predict</span>
+      </li>
+      <li class="nav-item" data-tab="live" id="nav-live">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-label">Live</span>
+      </li>
+      <li class="nav-item" data-tab="history" id="nav-history">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">History</span>
+      </li>
+      <li class="nav-item" data-tab="trading" id="nav-trading">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label">Paper Trade</span>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="api-status" id="apiStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Checking API…</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ══════════════════ MAIN CONTENT ══════════════════ -->
+  <main class="main-content">
+
+    <!-- ─── TOPBAR ─── -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title" id="pageTitle">Candlestick Chart</h1>
+        <span class="page-sub" id="pageSub">AAPL · 1980–2026 Historical Data</span>
+      </div>
+      <div class="topbar-right">
+        <div class="ticker-badge" id="tickerBadge">AAPL</div>
+        <div class="clock" id="clock"></div>
+      </div>
+    </header>
+
+    <!-- ════════ TAB: CHART ════════ -->
+    <section class="tab-content active" id="tab-chart">
+
+      <!-- Stats bar -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card" id="stat-close">
+          <span class="stat-label">Close</span>
+          <span class="stat-value" id="valClose">—</span>
+        </div>
+        <div class="stat-card" id="stat-open">
+          <span class="stat-label">Open</span>
+          <span class="stat-value" id="valOpen">—</span>
+        </div>
+        <div class="stat-card" id="stat-high">
+          <span class="stat-label">High</span>
+          <span class="stat-value green" id="valHigh">—</span>
+        </div>
+        <div class="stat-card" id="stat-low">
+          <span class="stat-label">Low</span>
+          <span class="stat-value red" id="valLow">—</span>
+        </div>
+        <div class="stat-card" id="stat-vol">
+          <span class="stat-label">Volume</span>
+          <span class="stat-value" id="valVol">—</span>
+        </div>
+        <div class="stat-card" id="stat-rsi">
+          <span class="stat-label">RSI</span>
+          <span class="stat-value" id="valRSI">—</span>
+        </div>
+        <div class="stat-card" id="stat-macd">
+          <span class="stat-label">MACD</span>
+          <span class="stat-value" id="valMACD">—</span>
+        </div>
+      </div>
+
+      <!-- Period selector + overlay controls -->
+      <div class="chart-controls">
+        <div class="period-tabs" id="periodTabs">
+          <button class="period-btn" data-period="1D" id="btn-1D">1D</button>
+          <button class="period-btn" data-period="2D" id="btn-2D">2D</button>
+          <button class="period-btn" data-period="1W" id="btn-1W">1W</button>
+          <button class="period-btn" data-period="1M" id="btn-1M">1M</button>
+          <button class="period-btn" data-period="3M" id="btn-3M">3M</button>
+          <button class="period-btn" data-period="6M" id="btn-6M">6M</button>
+          <button class="period-btn" data-period="1Y" id="btn-1Y">1Y</button>
+          <button class="period-btn" data-period="5Y" id="btn-5Y">5Y</button>
+          <button class="period-btn active" data-period="ALL" id="btn-ALL">ALL</button>
+        </div>
+        <div class="overlay-controls">
+          <label class="overlay-toggle" id="toggle-sma">
+            <input type="checkbox" id="chk-sma" checked /> SMA20
+          </label>
+          <label class="overlay-toggle" id="toggle-ema">
+            <input type="checkbox" id="chk-ema" /> EMA20
+          </label>
+          <label class="overlay-toggle" id="toggle-bb">
+            <input type="checkbox" id="chk-bb" /> BB
+          </label>
+        </div>
+      </div>
+
+      <!-- Chart container -->
+      <div class="chart-wrapper" id="chartWrapper">
+        <div class="chart-loader" id="chartLoader">
+          <div class="loader-spinner"></div>
+          <span>Loading chart data…</span>
+        </div>
+        <div id="candleChart"></div>
+      </div>
+
+      <!-- Volume chart -->
+      <div class="volume-wrapper" id="volumeWrapper">
+        <div id="volumeChart"></div>
+      </div>
+
+      <!-- CSV upload option -->
+      <div class="csv-info-bar">
+        <span class="csv-icon">📁</span>
+        <span>Loaded: <strong id="csvFileName">AAPL_indicators_1980-12-12_to_2026-05-18.csv</strong></span>
+        <label class="csv-upload-btn" for="csvUpload">Upload Different CSV</label>
+        <input type="file" id="csvUpload" accept=".csv" style="display:none" />
+        <span class="csv-rows" id="csvRows"></span>
+      </div>
+
+    </section>
+
+    <!-- ════════ TAB: PREDICT ════════ -->
+    <section class="tab-content" id="tab-predict">
+      <div class="panel-grid">
+        <div class="panel glass-panel">
+          <h2 class="panel-title">Manual OHLCV Prediction</h2>
+          <p class="panel-desc">Enter OHLCV values to get an AI-powered direction prediction via <code>POST /api/v1/predict</code></p>
+          <form class="predict-form" id="predictForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="inp-ticker">Ticker</label>
+                <input type="text" id="inp-ticker" placeholder="e.g. AAPL" maxlength="10" value="AAPL" />
+              </div>
+              <div class="form-group">
+                <label for="inp-open">Open</label>
+                <input type="number" id="inp-open" placeholder="e.g. 210.50" step="0.01" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="inp-high">High</label>
+                <input type="number" id="inp-high" placeholder="e.g. 215.00" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="inp-low">Low</label>
+                <input type="number" id="inp-low" placeholder="e.g. 208.00" step="0.01" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="inp-close">Close</label>
+                <input type="number" id="inp-close" placeholder="e.g. 213.00" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="inp-volume">Volume</label>
+                <input type="number" id="inp-volume" placeholder="e.g. 55000000" step="1" />
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="predictBtn">
+              <span class="btn-icon">🔮</span> Run Prediction
+            </button>
+          </form>
+        </div>
+
+        <div class="panel glass-panel result-panel" id="predictResult" style="display:none">
+          <h2 class="panel-title">Prediction Result</h2>
+          <div class="result-direction" id="resultDirection"></div>
+          <div class="result-meta" id="resultMeta"></div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-label">Confidence</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+            <div class="confidence-pct" id="confidencePct"></div>
+          </div>
+          <div class="result-raw" id="resultRaw"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ TAB: LIVE PREDICTION ════════ -->
+    <section class="tab-content" id="tab-live">
+      <div class="panel-grid">
+        <div class="panel glass-panel">
+          <h2 class="panel-title">⚡ Live Prediction</h2>
+          <p class="panel-desc">Fetch the latest OHLCV from Twelve Data and run a live prediction via <code>GET /api/v1/predict/live</code></p>
+          <form class="predict-form" id="liveForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="live-ticker">Ticker Symbol</label>
+                <input type="text" id="live-ticker" placeholder="e.g. RELIANCE, TCS, INFY" value="AAPL" maxlength="10" />
+              </div>
+              <div class="form-group">
+                <label for="live-exchange">Exchange</label>
+                <select id="live-exchange">
+                  <option value="NSE">NSE</option>
+                  <option value="BSE">BSE</option>
+                  <option value="NASDAQ">NASDAQ</option>
+                  <option value="NYSE">NYSE</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="liveBtn">
+              <span class="btn-icon">⚡</span> Fetch & Predict Live
+            </button>
+          </form>
+        </div>
+
+        <div class="panel glass-panel result-panel" id="liveResult" style="display:none">
+          <h2 class="panel-title">Live Result</h2>
+          <div class="result-direction" id="liveDirection"></div>
+          <div class="result-meta" id="liveMeta"></div>
+          <div class="confidence-bar-wrap">
+            <div class="confidence-label">Confidence</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" id="liveConfidenceFill"></div>
+            </div>
+            <div class="confidence-pct" id="liveConfidencePct"></div>
+          </div>
+          <div class="result-raw" id="liveRaw"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ TAB: HISTORY ════════ -->
+    <section class="tab-content" id="tab-history">
+      <div class="panel glass-panel full-panel">
+        <div class="history-header">
+          <h2 class="panel-title">Prediction History</h2>
+          <div class="history-controls">
+            <input type="text" id="historyFilter" placeholder="Filter by ticker…" class="filter-input" />
+            <button class="fetch-btn" id="fetchHistoryBtn">
+              <span>🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap" id="historyTableWrap">
+          <div class="empty-state" id="historyEmpty">
+            <span class="empty-icon">📋</span>
+            <p>No history loaded yet. Click Refresh to fetch from API.</p>
+          </div>
+          <table class="history-table" id="historyTable" style="display:none">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Direction</th>
+                <th>Confidence</th>
+                <th>Open</th>
+                <th>High</th>
+                <th>Low</th>
+                <th>Close</th>
+                <th>Volume</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <div class="history-footer" id="historyFooter"></div>
+      </div>
+    </section>
+
+    <!-- ════════ TAB: PAPER TRADING ════════ -->
+    <section class="tab-content" id="tab-trading">
+
+      <!-- Top row: launch form + live status -->
+      <!-- Top row: launch form -->
+      <div class="panel-grid">
+        <div class="panel glass-panel" style="grid-column: 1 / -1;">
+          <h2 class="panel-title">🤖 Launch Trading Agent</h2>
+          <p class="panel-desc">The agent fetches real market data from <code>yfinance</code>, runs the ML model, and autonomously BUYs / SELLs using paper money.</p>
+          <form class="predict-form" id="tradeStartForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="trade-ticker">Ticker</label>
+                <input type="text" id="trade-ticker" placeholder="e.g. AAPL, RELIANCE.NS" value="AAPL" />
+              </div>
+              <div class="form-group">
+                <label for="trade-capital">Starting Capital ($)</label>
+                <input type="number" id="trade-capital" value="100000" step="1000" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="trade-pct">Trade Size (%)</label>
+                <input type="number" id="trade-pct" value="90" min="1" max="100" step="1" />
+              </div>
+              <div class="form-group">
+                <label for="trade-interval">Cycle (seconds)</label>
+                <input type="number" id="trade-interval" value="60" min="10" step="10" />
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" id="tradeStartBtn">
+              <span class="btn-icon">🚀</span> Start Agent
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Multi-Agent Container -->
+      <div id="multiAgentsContainer"></div>
+
+      <!-- Template for Agent Dashboard Card (Hidden) -->
+      <template id="agentCardTemplate">
+        <div class="agent-dashboard-card panel glass-panel" style="margin-bottom:20px; border: 1px solid var(--border);">
+          
+          <div class="history-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px;">
+            <div>
+              <h2 class="panel-title agent-title">Ticker</h2>
+              <span class="badge agent-id-badge" style="font-family:monospace; margin-top:8px; display:inline-block;">Agent ID</span>
+            </div>
+            <div class="history-controls">
+              <span class="agent-status-badge"></span>
+              <button class="stop-btn delete-agent-btn" style="background:var(--red);border-color:var(--red);padding:4px 8px;font-size:12px;margin-left:8px;cursor:pointer;">🗑 Delete</button>
+            </div>
+          </div>
+
+          <!-- P&L summary bar -->
+          <div class="pnl-bar" style="margin-bottom:16px;">
+            <div class="pnl-item">
+              <span class="pnl-label">Total P&L</span>
+              <span class="pnl-value t-pnlTotal">—</span>
+            </div>
+            <div class="pnl-item">
+              <span class="pnl-label">Return</span>
+              <span class="pnl-value t-pnlPct">—</span>
+            </div>
+            <div class="pnl-item">
+              <span class="pnl-label">Portfolio Value</span>
+              <span class="pnl-value t-pnlPortfolio">—</span>
+            </div>
+            <div class="pnl-item">
+              <span class="pnl-label">Cash</span>
+              <span class="pnl-value t-pnlCash">—</span>
+            </div>
+            <div class="pnl-item">
+              <span class="pnl-label">Shares Held</span>
+              <span class="pnl-value t-pnlShares">—</span>
+            </div>
+            <div class="pnl-item">
+              <span class="pnl-label">Cycles Run</span>
+              <span class="pnl-value t-pnlCycles">—</span>
+            </div>
+          </div>
+
+          <!-- Trading Chart -->
+          <h2 class="panel-title" style="margin-bottom: 12px; font-size:14px; color:var(--text-muted)">Live Intraday Chart</h2>
+          <div class="tradingChartWrapper" style="width:100%; height:320px; position:relative; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 6px;"></div>
+
+          <!-- Trade log -->
+          <h2 class="panel-title" style="margin-bottom: 12px; font-size:14px; color:var(--text-muted)">Recent Trades</h2>
+          <div class="table-wrap" style="max-height: 250px; overflow-y: auto;">
+            <div class="empty-state t-tradeLogEmpty">
+              <span class="empty-icon" style="font-size:24px;">📝</span>
+              <p style="font-size:13px;">No trades yet.</p>
+            </div>
+            <table class="history-table t-tradeLogTable" style="display:none; font-size:13px;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Action</th>
+                  <th>Price</th>
+                  <th>Shares</th>
+                  <th>Value</th>
+                  <th>Realized P&L</th>
+                </tr>
+              </thead>
+              <tbody class="t-tradeLogBody"></tbody>
+            </table>
+          </div>
+          
+        </div>
+      </template>
+
+      <!-- All agents list -->
+      <div class="panel glass-panel full-panel">
+        <div class="history-header">
+          <h2 class="panel-title">All Agents</h2>
+          <div class="history-controls">
+            <button class="stop-btn" id="stopAllAgentsBtn">⏹ Stop All</button>
+            <button class="stop-btn" style="background:var(--red);border-color:var(--red)" id="deleteAllAgentsBtn">🗑 Delete All</button>
+            <button class="fetch-btn" id="fetchAgentsBtn"><span>🔄</span> Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="empty-state" id="agentsEmpty">
+            <span class="empty-icon">🤖</span>
+            <p>No agents found. Start one above.</p>
+          </div>
+          <table class="history-table" id="agentsTable" style="display:none">
+            <thead>
+              <tr>
+                <th>Agent ID</th>
+                <th>Ticker</th>
+                <th>Status</th>
+                <th>Portfolio Value</th>
+                <th>Total P&L</th>
+                <th>Return</th>
+                <th>Shares</th>
+                <th>Last Action</th>
+                <th>Cycles</th>
+                <th>Last Cycle</th>
+              </tr>
+            </thead>
+            <tbody id="agentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+</main>
+
+  <!-- Toast notifications -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
